@@ -32,7 +32,7 @@
  */
 static int do_create(const char *path, int nbranch_ro, int nbranch_rw) {
 	DBG("%s\n", path);
-    USYSLOG(LOG_INFO, "unionfs_log:  do_create %s", path);
+
 	char dirp[PATHLEN_MAX]; // dir path to create
 	sprintf(dirp, "%s%s", uopt.branches[nbranch_rw].path, path);
 
@@ -80,6 +80,8 @@ static int do_create(const char *path, int nbranch_ro, int nbranch_rw) {
  */
 int path_create(const char *path, int nbranch_ro, int nbranch_rw) {
 	DBG("%s\n", path);
+
+    USYSLOG(LOG_INFO, "path_create %s", path);
 
 	if (!uopt.cow_enabled) RETURN(0);
 

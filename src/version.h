@@ -4,5 +4,5 @@
 */
 
 #ifndef _VERSION_H
-#define VERSION "2.3-bryder-2946418564985a9e0fc643fd431e5853052be51f"
+#define VERSION "2.3-bryder-refinedlog"
 #endif
