@@ -36,8 +36,17 @@
 static ulogs_t *free_head, *free_bottom; // free chained list log entries
 static ulogs_t *used_head = NULL, *used_bottom = NULL; //used chained list pointers
 
-static pthread_mutex_t list_lock; 	// locks the entire chained list
-static pthread_cond_t cond_message;		// used to wake up the syslog thread
+typedef struct {
+    pthread_cond_t cond_message;
+    pthread_mutex_t list_lock;
+} usyslog_barrier_t;
+
+static usyslog_barrier_t *usyslog_barrier;
+static pthread_cond_t *cond_message;
+static pthread_mutex_t *list_lock;
+
+//static pthread_mutex_t list_lock; 	// locks the entire chained list
+//static pthread_cond_t cond_message;		// used to wake up the syslog thread
 
 // Only used for debugging, protected by list_lock
 static int free_entries;  
@@ -48,7 +57,7 @@ static int used_entries = 0;
 #ifdef USYSLOG_DEBUG
 static void verify_lists()
 {
-	pthread_mutex_lock(&list_lock);
+	pthread_mutex_lock(list_lock);
 	
 	ulogs_t *entry = free_head;
 	int free_count = -1;
@@ -81,11 +90,12 @@ static void verify_lists()
 		     " (used: %d vs. %d) (free: %d vs. %d) \n", 
 		     used_count, used_entries, free_count, free_entries);
 		     
-	pthread_mutex_unlock(&list_lock);
+	pthread_mutex_unlock(list_lock);
 }
 #else
 #define verify_lists()
 #endif
+#include <sys/mman.h>
 
 
 /**
@@ -93,7 +103,7 @@ static void verify_lists()
  */
 static void do_syslog(void)
 {
-	pthread_mutex_lock(&list_lock); // we MUST ensure not to keep that forever
+	pthread_mutex_lock(list_lock); // we MUST ensure not to keep that forever
 
 	ulogs_t *log_entry = used_head;
 
@@ -107,13 +117,13 @@ static void do_syslog(void)
 			// If something goes wrong with the log_entry we do not
 			// block the critical list_lock forever!
 			// EBUSY might come up rarely, if we race with usyslog()
-			pthread_mutex_unlock(&list_lock);
+			pthread_mutex_unlock(list_lock);
 			sleep(1);
-			pthread_mutex_lock(&list_lock);
+			pthread_mutex_lock(list_lock);
 			log_entry = used_head;
 			continue;
 		}
-		pthread_mutex_unlock(&list_lock);
+		pthread_mutex_unlock(list_lock);
 		
 		// This syslog call and so this lock might block, so be
 		// carefull on using locks! The filesystem IO thread
@@ -122,7 +132,7 @@ static void do_syslog(void)
 		log_entry->used = false;
 
 		// NOTE: The list is only locked now, after syslog() succeeded!
-		pthread_mutex_lock(&list_lock);
+		pthread_mutex_lock(list_lock);
 		ulogs_t *next_entry = log_entry->next; // just to save the pointer
 		
 		used_head = log_entry->next;
@@ -140,7 +150,7 @@ static void do_syslog(void)
 		free_entries++;
 		used_entries--;
 			
-		pthread_mutex_unlock(&list_lock); // unlock ist ASAP
+		pthread_mutex_unlock(list_lock); // unlock ist ASAP
 		
 		log_entry = next_entry;
 		pthread_mutex_unlock(entry_lock);
@@ -165,7 +175,7 @@ static void * syslog_thread(void *arg)
 	pthread_mutex_init(&sleep_mutex, NULL);
 	pthread_mutex_lock(&sleep_mutex);
 	while (1) {
-		pthread_cond_wait(&cond_message, &sleep_mutex);
+		pthread_cond_wait(cond_message, &sleep_mutex);
 		do_syslog();
 	}
 
@@ -182,14 +192,14 @@ void usyslog(int priority, const char *format, ...)
 
 	// Lock the entire list first, which means the syslog thread MUST NOT
 	// lock it if there is any chance it might be locked forever.
-	pthread_mutex_lock(&list_lock);
+	pthread_mutex_lock(list_lock);
 	
 	// Some sanity checks. If we fail here, we will leak a log entry,
 	// but will not lock up.
 
 	if (free_head == NULL) {
 		DBG("All syslog entries already busy\n");
-		pthread_mutex_unlock(&list_lock);
+		pthread_mutex_unlock(list_lock);
 		return;
 	}
 	
@@ -200,12 +210,12 @@ void usyslog(int priority, const char *format, ...)
 	if (res == EBUSY) {
 			// huh, that never should happen!
 			DBG("Critical log error, log entry is BUSY, but should not\n");
-			pthread_mutex_unlock(&list_lock);
+			pthread_mutex_unlock(list_lock);
 			return;
 	} else if (res) {
 		// huh, that never should happen either!
 		DBG("Never should happen, can get lock: %s\n", strerror(res));
-		pthread_mutex_unlock(&list_lock);
+		pthread_mutex_unlock(list_lock);
 		return;
 	}
 
@@ -213,7 +223,7 @@ void usyslog(int priority, const char *format, ...)
 		// huh, that never should happen either!
 		DBG("Never should happen, entry is busy, but should not!\n");
 		pthread_mutex_unlock(&log->lock);
-		pthread_mutex_unlock(&list_lock);
+		pthread_mutex_unlock(list_lock);
 		return;
 	}
 
@@ -237,7 +247,7 @@ void usyslog(int priority, const char *format, ...)
 	used_entries++;
 		
 	// Everything below is log entry related, so we can free the list_lock
-	pthread_mutex_unlock(&list_lock);
+	pthread_mutex_unlock(list_lock);
 	
 	va_list ap;
 	va_start(ap, format);
@@ -247,7 +257,7 @@ void usyslog(int priority, const char *format, ...)
 
 	pthread_mutex_unlock(&log->lock);
 
-	pthread_cond_signal(&cond_message); // wake up the syslog thread
+	pthread_cond_signal(cond_message); // wake up the syslog thread
 }
 
 /**
@@ -256,9 +266,27 @@ void usyslog(int priority, const char *format, ...)
 void init_syslog(void)
 {
 	openlog("unionfs-fuse: ", LOG_CONS | LOG_NDELAY | LOG_NOWAIT | LOG_PID, LOG_DAEMON);
+    // When fuse is not running in foreground mode you have to use shared memory to be able to syslog
+    // because it forks
+    int zfd;
+    zfd = open("/dev/zero", O_RDWR);
+    usyslog_barrier = (usyslog_barrier_t *)mmap(
+            NULL, sizeof(usyslog_barrier_t), PROT_READ|PROT_WRITE, MAP_SHARED, zfd, 0);
+    list_lock = &usyslog_barrier->list_lock;
+    cond_message = &usyslog_barrier->cond_message;
 
-	pthread_mutex_init(&list_lock, NULL);
-	pthread_cond_init(&cond_message, NULL);
+    pthread_mutexattr_t mattr;
+    pthread_mutexattr_init(&mattr);
+    pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+
+	pthread_mutex_init(list_lock, &mattr);
+
+    pthread_condattr_t cattr;
+    pthread_condattr_init(&cattr);
+    pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
+
+	pthread_cond_init(cond_message, &cattr);
+
 	pthread_t thread;
 	pthread_attr_t attr;
 	int t_arg = 0; // thread argument, not required for us
