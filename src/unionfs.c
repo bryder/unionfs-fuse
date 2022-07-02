@@ -41,8 +41,8 @@ static struct fuse_opt unionfs_opts[] = {
 
 int main(int argc, char *argv[]) {
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-
-	init_syslog();
+    // Initing here is a problem because the log thread ends up exiting in non foreground mode
+	// init_syslog();
 	uopt_init();
 
 	if (fuse_opt_parse(&args, NULL, unionfs_opts, unionfs_opt_proc) == -1) RETURN(1);
