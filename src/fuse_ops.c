@@ -246,6 +246,10 @@ static void *unionfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg) 
 #endif
 	(void) conn;  // just to prevent the compiler complaining about unused variables
 
+    // You have to init the syslog threads here because when it fuse runs as daemon
+    // the threads need to be in this process tree.
+    init_syslog();
+
 	// we only now (from unionfs_init) may go into the chroot, since otherwise
 	// fuse_main() will fail to open /dev/fuse and to call mount
 	if (uopt.chroot) {
