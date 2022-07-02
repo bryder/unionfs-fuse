@@ -1,0 +1,46 @@
+#!/bin/bash
+test_dir="/tmp/union_test"
+ro_dir="${test_dir}/ro"
+rw_dir="${test_dir}/rw"
+union_dir="${test_dir}/union"
+
+setup_test(){
+
+  mkdir -p "${ro_dir}"
+  mkdir -p "${rw_dir}"
+  mkdir -p "${union_dir}"
+
+  local -a subdirs=("one/sub_dir" "two/sub_dir")
+  local d
+  for d in "${subdirs[@]}"; do
+    mkdir -p "${ro_dir}/$d"
+  done
+  local -a unionfs_cmd
+  # shellcheck disable=SC2054
+  unionfs_cmd=(
+    cmake-build-debug/src/unionfs
+    "${rw_dir}=RW:${ro_dir}=RO"
+    "${union_dir}"
+    -o rw,cow,allow_other,hide_meta_files,dev,suid
+
+  )
+  local ltrace_prefix=(ltrace -f -o /tmp/unionfs.ltrace)
+  local debug_file="${test_dir}/debug.log"
+  local -a debug_args=(debug_file="$debug_file" -d)
+  echo "About to execute: "
+  printf "%q " "${unionfs_cmd[@]}"
+  echo
+}
+
+rsyslog_setup(){
+  # remove the comment from the daemon log line
+  sed -ie "s/^#\\(daemon\\.\\*\\s\\)/\\1/" /etc/rsyslog.d/50-default.conf
+
+  /etc/init.d/rsyslog start
+}
+re_test(){
+  rm -r "${rw_dir:?}"/*
+  echo "blah" > "${union_dir}/one/sub_dir/afile"
+  mkdir  -p  "${union_dir}/two/sub_dir/another_dir"
+
+}
