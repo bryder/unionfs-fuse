@@ -32,7 +32,7 @@
  */
 static int do_create(const char *path, int nbranch_ro, int nbranch_rw) {
 	DBG("%s\n", path);
-
+    usyslog(LOG_INFO, "unionfs_log:  do_create %s", path);
 	char dirp[PATHLEN_MAX]; // dir path to create
 	sprintf(dirp, "%s%s", uopt.branches[nbranch_rw].path, path);
 
@@ -80,7 +80,7 @@ static int do_create(const char *path, int nbranch_ro, int nbranch_rw) {
  */
 int path_create(const char *path, int nbranch_ro, int nbranch_rw) {
 	DBG("%s\n", path);
-
+    usyslog(LOG_INFO, "Info test path_create %s", path);
 	if (!uopt.cow_enabled) RETURN(0);
 
 	char p[PATHLEN_MAX];
@@ -119,7 +119,7 @@ int path_create(const char *path, int nbranch_ro, int nbranch_rw) {
  */
 int path_create_cutlast(const char *path, int nbranch_ro, int nbranch_rw) {
 	DBG("%s\n", path);
-
+    usyslog(LOG_INFO, "unionfs_log: path_create_cutlast %s", path);
 	char *dname = u_dirname(path);
 	if (dname == NULL)
 		RETURN(-ENOMEM);
@@ -134,7 +134,7 @@ int path_create_cutlast(const char *path, int nbranch_ro, int nbranch_rw) {
  */
 int cow_cp(const char *path, int branch_ro, int branch_rw, bool copy_dir) {
 	DBG("%s\n", path);
-
+    usyslog(LOG_INFO, "unionfs_log: cow_cp %s", path);
 	// create the path to the file
 	path_create_cutlast(path, branch_ro, branch_rw);
 
@@ -195,7 +195,7 @@ int cow_cp(const char *path, int branch_ro, int branch_rw, bool copy_dir) {
  */
 int copy_directory(const char *path, int branch_ro, int branch_rw) {
 	DBG("%s\n", path);
-
+    usyslog(LOG_INFO, "unionfs_log: copy_directory %s", path);
 	/* create the directory on the destination branch */
 	int res = path_create(path, branch_ro, branch_rw);
 	if (res != 0) {
