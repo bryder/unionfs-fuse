@@ -4,5 +4,5 @@
 */
 
 #ifndef _VERSION_H
-#define VERSION "3.1"
+#define VERSION "3.1.bryder.1"
 #endif
