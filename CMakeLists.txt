@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 
-project(unionfs-fuse VERSION 2.3
+project(unionfs-fuse VERSION 3.1
                      DESCRIPTION "user-space implementation of union filesystem (with help of fuse)"
                      LANGUAGES C)
 
@@ -30,6 +30,12 @@ IF (WITH_XATTR)
 ELSE (WITH_XATTR)
 	add_definitions(-DDISABLE_XATTR)
 ENDIF (WITH_XATTR)
+
+if (UNIX AND APPLE)
+	find_library(MACFUSE_PATH fuse HINTS /usr/local/lib)
+	get_filename_component(MACFUSE_DIRECTORY ${MACFUSE_PATH} DIRECTORY)
+	link_directories(${MACFUSE_DIRECTORY})
+endif()
 
 INSTALL(PROGRAMS mount.unionfs DESTINATION sbin)
 
