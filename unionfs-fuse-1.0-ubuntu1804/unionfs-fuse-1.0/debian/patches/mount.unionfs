@@ -1,0 +1,17 @@
+mount.unionfs: Add to cmake install target
+
+This script should be installed to be of any use.
+
+
+Index: unionfs-fuse-1.0/CMakeLists.txt
+===================================================================
+--- unionfs-fuse-1.0.orig/CMakeLists.txt	2015-01-14 11:08:20.000000000 +0100
++++ unionfs-fuse-1.0/CMakeLists.txt	2015-07-13 23:42:57.552693943 +0200
+@@ -41,5 +41,7 @@
+ 	add_definitions(-DDISABLE_XATTR)
+ ENDIF (WITH_XATTR)
+ 
++INSTALL(PROGRAMS mount.unionfs DESTINATION sbin)
++
+ add_subdirectory(src)
+ add_subdirectory(man)

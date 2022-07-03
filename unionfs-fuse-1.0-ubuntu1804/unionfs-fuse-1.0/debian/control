@@ -1,0 +1,16 @@
+Source: unionfs-fuse
+Section: misc
+Priority: optional
+Homepage: https://github.com/rpodgorny/unionfs-fuse
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+XSBC-Original-Maintainer: Bernd Schubert <bernd.schubert@fastmail.fm>
+Build-Depends: debhelper (>= 9.0.0), libfuse-dev, cmake
+Standards-Version: 3.9.6
+
+Package: unionfs-fuse
+Architecture: linux-any
+Multi-Arch: foreign
+Depends: ${shlibs:Depends}, ${misc:Depends}, fuse
+Description: Fuse implementation of unionfs
+ This is another unionfs implementation using filesystem in 
+ userspace (fuse).
